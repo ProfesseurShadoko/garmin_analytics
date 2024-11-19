@@ -363,6 +363,8 @@ class ClimbSet:
         
         plt.xlabel("Distance (km)")
         plt.ylabel("Elevation (m)")
+        plt.show()
+        print(" ")
         
         
     
