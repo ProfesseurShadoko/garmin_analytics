@@ -30,7 +30,6 @@ Clone the repository and install the dependencies:
 !pip install -r garmin_analytics/requirements.txt
 ```
 
-
 Alternatively, you can explore and run the notebook directly on [Google Colab](https://colab.research.google.com/drive/1HUpoJkPbcm-DYhw0lHtFHNQtCdfP05UL "Open Colab"). This option simplifies the installation process, especially for those unfamiliar with Python, although it may run slightly slower.
 
 ## Get Started
@@ -38,6 +37,10 @@ Alternatively, you can explore and run the notebook directly on [Google Colab](h
 Open the **`garmin_analytics.ipynb`** file to dive into the analysis. The notebook contains detailed explanations of the computations, equations, and visualizations, making it easy to follow along and adapt the analysis to your needs.
 
 Whether you're here to have fun with physics, track your performance, or learn how platforms like Garmin and Strava process cycling data, **Garmin Analytics** is your gateway to uncovering the science behind the ride.
+
+## If you don't use Garmin
+
+Alternatively, you can direclty import a *.fit* file and give it to the algorithm. The Notebook `fit_upload_analytics.ipynb` explains how to do it, either on your computer or on [Google Colab](https://colab.research.google.com/drive/1jmD4NH9Tys4aRpTD7EvTdGG3M0xx1xcG?usp=sharing "Open Upload Notebook").
 
 ## Note from the author
 
