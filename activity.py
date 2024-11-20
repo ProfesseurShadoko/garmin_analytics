@@ -51,6 +51,8 @@ class Activity:
         self.data['braking_power'] : float (in W, power due to braking, negative values from above)
     
     """
+    Crr = 0.005 # see wikipedia, 8.3 bar tires bike at 50kph
+    Cd = 1.0
     
     
     def __init__(self, fitfile: FitFile, mass:float, height:float, bike_mass:float, age:int, gender:str, recompute_altitude=True) -> None:
@@ -218,7 +220,7 @@ class Activity:
             ### CONSTANTS ###
             #################
             
-            drag_coefficient = 1.0
+            drag_coefficient = self.Cd
             rho0 = 1.225 # kg/m^3 --> air volumic mass at 0m
             L = 0.0065 # K/m --> temperature gradient
             T0 = 288.15 # K --> temperature at 0m
@@ -256,7 +258,7 @@ class Activity:
             self.data["delta_time_seconds"] = self.data["delta_time"].dt.total_seconds()
             
             with Task("Computing rolling resistance", new_line=False): # needed slope for that
-                Crr = 0.005 # see wikipedia, 8.3 bar tires bike at 50kph
+                Crr = self.Crr 
                 self.data['rolling_resistance'] = Crr * (self.mass + self.bike_mass) * g * np.cos(np.arctan(self.data['slope']))
                 
             
@@ -411,7 +413,7 @@ class Activity:
         with open(file, 'rb') as f:
             fitfile = FitFile(f)
     
-        return Activity(fitfile, mass, height, bike_mass, age, gender, recompute_altitude)
+            return Activity(fitfile, mass, height, bike_mass, age, gender, recompute_altitude) # needs to be done while the file is still open!
     
     @staticmethod
     def get_metrics(activity:'Activity') -> dict:
