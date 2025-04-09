@@ -204,6 +204,8 @@ class Activity:
                     
                     for window in ProgressBar([(i*N_window, (i+1)*N_window) for i in range(len(df)//N_window)] + [(len(df)//N_window * N_window, len(df))], new_line=False):
                         lats, lons = df["lat"].iloc[window[0]:window[1]], df["lon"].iloc[window[0]:window[1]]
+                        if len(lats) == 0:
+                            continue
                         new_altitude_data.extend(get_elevation(lats, lons))
                         time.sleep(1) # not allowed to request more than 1 request per second
                 
