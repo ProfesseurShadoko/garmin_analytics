@@ -113,10 +113,11 @@ class ActivitySet:
 
         """
         df = pd.DataFrame(garth.connectapi(ActivitySet.activity_list))
-        
+        Message.print(f"Retrieved {len(df)} activities from Garmin API")
         # find bike activities
         df["activityTypeId"] = df["activityType"].apply(lambda x: x["typeId"])
-        df = df[df["activityTypeId"].isin(ActivitySet.cycling_activity_ids)]
+        df = df[df["activityTypeId"].isin(ActivitySet.cycling_activity_ids)].copy(deep=True)
+        Message.print(f"Identified {len(df)} cycling activities")
         df["date"] = pd.to_datetime(df["startTimeGMT"]).dt.date
         df["distance_km"] = df["distance"] / 1000
         df["duration"] = df["duration"].apply(lambda x: datetime.timedelta(seconds=x))
@@ -236,8 +237,9 @@ class ActivitySet:
                 self.activities = ActivitySet.get_activities()
             
             with Task("Removing activities < 30 minutes", new_line=True):
-                self.activities = self.activities[self.activities["duration"] > datetime.timedelta(minutes=30)]
-                Message(f"Removed {cstr(len(self.activities)):y} activities.", "?")
+                previous_n_activities = len(self.activities)
+                self.activities = self.activities[self.activities["duration"] > datetime.timedelta(minutes=30)].copy(deep=True)
+                Message.print(f"Removed {cstr(len(self.activities)):y} activities out of {previous_n_activities} cycling activities.", "?")
                 self.activities.reset_index(drop=True, inplace=True)
                 
         
