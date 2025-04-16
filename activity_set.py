@@ -21,7 +21,7 @@ import getpass
 
 class ActivitySet:
     user_settings:str = "/userprofile-service/userprofile/user-settings"
-    activity_list:str = "/activitylist-service/activities/search/activities"
+    activity_list:str = "/activitylist-service/activities/search/activities?start=0&limit=1000"
     download_service:str = "/download-service/files/activity"
     cycling_activity_ids:list = [2]
     current_instance = None
