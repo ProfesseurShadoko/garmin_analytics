@@ -239,7 +239,7 @@ class ActivitySet:
             with Task("Removing activities < 30 minutes", new_line=True):
                 previous_n_activities = len(self.activities)
                 self.activities = self.activities[self.activities["duration"] > datetime.timedelta(minutes=30)].copy(deep=True)
-                Message.print(f"Removed {cstr(len(self.activities)):y} activities out of {previous_n_activities} cycling activities.", "?")
+                Message.print(f"Removed {cstr(previous_n_activities - len(self.activities)):y} activitie(s) out of {previous_n_activities} cycling activities.")
                 self.activities.reset_index(drop=True, inplace=True)
                 
         
