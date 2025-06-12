@@ -1,0 +1,36 @@
+
+<!DOCTYPE html>
+
+<html>
+    <head>
+        <TITLE>WattsUp</TITLE>
+    </head>
+
+    <body>
+        <h1>Test: orientation</h1>
+        <p><strong>Orientation:</strong></p>
+        <p>Alpha (z-axis): <span id="alpha">?</span></p>
+        <p>Beta (x-axis): <span id="beta">?</span></p>
+        <p>Gamma (y-axis): <span id="gamma">?</span></p>
+
+        <h1>Test: GPS</h1>
+        <p><strong>Latitude:</strong> <span id="latitude">?</span></p>
+        <p><strong>Longitude:</strong> <span id="longitude">?</span></p>
+
+        <script>
+
+            // Device Orientation
+            function startOrienation() {
+                if (window.DeviceOrientationEvent) {
+                    window.addEventListener("deviceorientation", function(event) {
+                        document.getElementById("alpha").innerText = event.alpha.toFixed(2);
+                        document.getElementById("beta").innerText = event.beta.toFixed(2);
+                        document.getElementById("gamma").innerText = event.gamma.toFixed(2);
+                    }, false);
+                } else {
+                    alert("Device Orientation API not supported.");
+                }
+            }
+        </script>
+    </body>
+</html>
