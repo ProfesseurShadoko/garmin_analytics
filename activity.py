@@ -236,7 +236,7 @@ class Activity:
             
             with Task("Computing drag", new_line=False):
                 projected_frontal_area = 0.0293 * (self.size**0.725) * (self.mass**0.425) + 0.0604
-                self.data['rho'] = rho0 * (1 - L * self.data['altitude'] / T0)**(g / (R * L - 1))
+                self.data['rho'] = rho0 * (1 - L * self.data['altitude'] / T0)**(g / (R * L) - 1)
                 kinetic_pressure = 0.5 * self.data['rho'] * self.data['speed']**2
                 self.data['drag'] = drag_coefficient * projected_frontal_area * kinetic_pressure
             
