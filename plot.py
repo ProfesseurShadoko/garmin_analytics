@@ -428,6 +428,9 @@ def plot_map(activity: Activity):
         lon_center = df['lon'].mean()
         
         m = folium.Map(location=[df['lat'].iloc[0],df["lon"].iloc[1]],zoom_start=18,tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr='Esri')
+        sw = [df['lat'].min(), df['lon'].min()]  # south‑west corner
+        ne = [df['lat'].max(), df['lon'].max()]  # north‑east corner
+        m.fit_bounds([sw, ne])
         
         # add lines of the stage depending on slope
         cmap = LinearSegmentedColormap.from_list(
