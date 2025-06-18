@@ -10,21 +10,22 @@ import datetime
 
 import requests
 import geopy
+from .fancy_package import Message, cstr
 
 class ClimbSet:
     scale = 1000 #m
     slope_treshold = 0.02 
     minimal_difficulty_score = 30
     
+    required_columns = ["distance", "altitude", "slope", "lon", "lat", "delta_time_seconds", "watts", "heart_rate"]
+    
     def __init__(self, data:pd.DataFrame):
         
-        data = data.dropna().copy(deep=True)
+    
+        assert all([col in data.columns for col in self.required_columns]), f"Missing required columns. Are required: {self.required_columns}"
+        data = data[self.required_columns]
         
-        required_columns = ["distance", "altitude", "slope", "lon", "lat", "delta_time_seconds"]
-        assert all([col in data.columns for col in required_columns]), f"Missing required columns. Are required: {required_columns}"
-        data = data[required_columns]
-        
-        self.data = data.dropna().reset_index(drop=True)
+        self.data = data.dropna().reset_index(drop=True).copy(deep=True)
         self.climb_candidates = []
         self.climb_start_candidates = []
         self.climbs = []
@@ -66,6 +67,7 @@ class ClimbSet:
         
         self.data["altitude"] = savgol_filter(self.data["altitude"], self.window, 3)
         self.data["slope"] = savgol_filter(self.data["slope"], self.window, 3)
+        self.data["watts"] = savgol_filter(self.data["watts"], self.window, 3)
         
     
     def find_maxima_minima(self):
@@ -228,6 +230,26 @@ class ClimbSet:
         plt.ylabel("Elevation (m)")
         plt.show()
         
+    def display_stats(self):
+        climb:pd.DataFrame
+
+        with Message("Statistics of the climbs:").tab():
+            
+            for i, climb in enumerate(self.climbs, start=1):
+                
+                climb["distance"] -= climb["distance"].iloc[0] # in place modification but don't worry, no problem in doing it twice
+                climb_distance = climb["distance"].iloc[-1]
+                climb_height = climb["altitude"].iloc[-1] - climb["altitude"].iloc[0]
+                climb_time = climb["delta_time_seconds"].sum()
+                avg_speed_kmh = climb_distance / climb_time * 3.6
+                
+                Message.par()
+                with Message(f"Climb n°{i} (category {self.climb_category(climb)})").tab():
+                    Message.print(f"Distance: {climb_distance/1000:.1f} km")
+                    Message.print(f"Elevation gain: {climb_height:.0f} m ({cstr(climb_height/climb_distance, format_spec='.1%').red().bold()} slope)")
+                    Message.print(f"Average speed: {avg_speed_kmh:.1f} km/h ({cstr(climb['watts'].mean(), format_spec='.0f').yellow().bold()} W)")
+                    Message.print(f"Average heart rate: {climb['heart_rate'].mean():.0f} bpm")
+        
     
     
     @staticmethod
@@ -287,10 +309,9 @@ class ClimbSet:
     @staticmethod
     def show_climb(climb:pd.DataFrame):
 
-        required_columns = ["distance", "altitude", "slope", "lon", "lat", "delta_time_seconds"]
-        assert all([col in climb.columns for col in required_columns]), "Missing required columns. Are required: distance, altitude, slope, lon, lat"
+        assert all([col in climb.columns for col in  ClimbSet.required_columns]), "Missing required columns. Are required: distance, altitude, slope, lon, lat"
         
-        climb = climb[required_columns].copy(deep=True)
+        climb = climb[ClimbSet.required_columns].copy(deep=True)
         climb["distance"] -= climb["distance"].iloc[0]
         
         climb_distance = climb["distance"].iloc[-1]
