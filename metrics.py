@@ -1,6 +1,12 @@
 
 import pandas as pd
 
+
+
+# ------------------------ #
+# !-- FTP calulcations --! #
+# ------------------------ #
+
 def min_periods(df:pd.DataFrame, minutes:int=0, seconds:int=0) -> int:
     """
     Columns
@@ -61,6 +67,11 @@ def get_vo2max(df:pd.DataFrame, mass:float, gender:str) -> float:
     return vo2max_v2(ppo=get_ppo(df), mass=mass, gender=gender)
 
 
+# ------------------------ #
+# !-- Training Metrics --! #
+# ------------------------ #
+
+
 def get_normalized_power(df:pd.DataFrame) -> float:
     """
     Columns
@@ -95,6 +106,57 @@ def get_training_stress_score(df:pd.DataFrame, mass:float = None, absolute:bool 
         return df["cumulative_time_seconds"].max() * get_normalized_power(df) * get_intensity_factor(df) * get_ftp(df) / 36 / (3.5*mass)**2
 
 
+# ------------------ #
+# !-- Watt Gains --! #
+# ------------------ #
+
+def get_speed_gain_per_watt(df:pd.DataFrame) -> float:
+    """
+    Columns
+    -------
+        'delta_watt_per_ms': float (W per m/s)
+    
+    Returns
+    -------
+        float: number of m/s gained per additional watt
+    """
+    mask = df["delta_watt_per_ms"] > 0
+    return df.loc[mask, "delta_watt_per_ms"].median()
+
+def get_watt_gain_per_kg(df:pd.DataFrame) -> float:
+    """
+    Columns
+    -------
+        'delta_watt_per_kg': float (W per kg)
+    
+    Returns
+    -------
+        float: number of W saved per kg lost
+    """
+    mask = df["delta_watt_per_kg"] > 0
+    return df.loc[mask, "delta_watt_per_kg"].median()
+
+def get_time_gain_per_watt(df:pd.DataFrame) -> float:
+    """
+    Columns
+    -------
+        'delta_watt_per_ms': float (W per m/s)
+    
+    Returns
+    -------
+        float: number of seconds gained per watt saved over 1 km
+    """
+    speed_gain_per_watt = get_speed_gain_per_watt(df)
+    total_distance_m = df["distance"].iloc[-1]
+    average_speed_m_s = df["speed"].median()
+    
+    return total_distance_m / (average_speed_m_s ** 2) * speed_gain_per_watt
+
+
+
+# ----------------- #
+# !-- Nutrition --! #
+# ----------------- #
 
 def get_calories(df:pd.DataFrame, mass:float, age:int) -> float:
     """
@@ -103,8 +165,30 @@ def get_calories(df:pd.DataFrame, mass:float, age:int) -> float:
         'watts': float (W)
         'delta_time_seconds': float (s)
         'heart_rate': float (bpm)
+    
+    Returns
+    -------
+        float: Calories burned (kcal)
     """
     return ((age * 0.2017 - 0.09036 * mass + df['heart_rate'] * 0.6309 - 55.0969)*(df['delta_time_seconds']/60)).sum()/4.184 # kJ to kcal
+
+
+def get_equivalent_pasta_grams(df:pd.DataFrame, mass:float, age:int) -> float:
+    """
+    Calls get_calories to get calories and convert to grams of pasta.
+    
+    Columns
+    -------
+        'watts': float (W)
+        'delta_time_seconds': float (s)
+        'heart_rate': float (bpm)
+    
+    Returns
+    -------
+        float: Equivalent grams of pasta (assuming 3.5 kcal per gram) before cooking.
+    """
+    return get_calories(df, mass, age) / 3.5
+
 
 def get_efficiency(df:pd.DataFrame, mass:float, age:float) -> float:
     """
