@@ -146,10 +146,39 @@ def display_activity_stats(activity:Activity):
         )
         
         Message.print(
+            "Equivalent pasta consumption: " + cstr(
+                round(activity_stats['equivalent_pasta_grams'])
+            ).bold().cyan() + " g"
+        )
+        
+        Message.print(
             "Efficiency: " + cstr(
                 activity_stats['efficiency_%']/100, format_spec=".0%"
             ).bold().cyan()
         )
+        
+        # Gains
+        Message.print(ignore_tabs=True)
+        Message.print(
+            "Speed gain per watt: " + cstr(
+                activity_stats['speed_meter_per_second_gain_per_watt'] * 3.6
+            ).bold().cyan() + " km/h/W"
+        )
+        
+        Message.print(
+            "Time gain per watt: " + cstr(
+                activity_stats['time_s_gain_per_watt']
+            ).bold().cyan() + " s/W"
+        )
+        
+        Message.print(
+            "Watt gain per kg: " + cstr(
+                activity_stats['watt_gain_per_kg']
+            ).bold().cyan() + " W/kg"
+        )
+        
+        
+        
    
    
 
