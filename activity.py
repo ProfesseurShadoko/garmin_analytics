@@ -216,149 +216,183 @@ class Activity:
                 window = np.round(200 / dx).astype(int) # 200m window, about 15 measures
                 smooth_altitude = savgol_filter(new_altitude_data, window, 3)
                 self.data['altitude'] = smooth_altitude
+            
+            self._process_power()
+            
+            with Task("Computing power gradiants"):
                 
-            
-            #################
-            ### CONSTANTS ###
-            #################
-            
-            drag_coefficient = self.Cd
-            rho0 = 1.225 # kg/m^3 --> air volumic mass at 0m
-            L = 0.0065 # K/m --> temperature gradient
-            T0 = 288.15 # K --> temperature at 0m
-            R = 287.05 # J/(kg*K) --> gas constant
-            g = 9.807 # m/s^2 --> gravity
+                # 1. compute delta_watt_per_ms (W per m/s)
+                df_temp = self.data.copy(deep=True) # we will modify data in place, this is to restore it later
+                self.data["speed"] = self.data["speed"] + 0.1 # add 0.1 m/s
+                # we also need to update the time delta to match this new speed. time = distance / speed --> dt/dv = -d/v^2 --> time_difference = - delta_d / v^2 * delta_v = - old_delta_time *delta_v/v
+                self.data["delta_time_seconds"] = self.data["delta_time_seconds"] - self.data["delta_time_seconds"] * 0.1 / self.data["speed"]
+                self.data["cumulative_time_seconds"] = self.data["delta_time_seconds"].cumsum()
+                with Message.mute():
+                    self._process_power()
+                delta_watt_per_ms = self.data["watts"] - df_temp["watts"]
+                self.data = df_temp # restore
+                self.data["delta_watt_per_ms"] = delta_watt_per_ms / 0.1 # per m/s
+                
+                # 2. compute delta_watt_per_kg (W per kg)
+                df_temp = self.data.copy(deep=True) # we will modify data in place, this is to restore it later
+                self.mass = self.mass - 1 # lose 1kg
+                with Message.mute():
+                    self._process_power()
+                delta_watt_per_kg = df_temp["watts"] - self.data["watts"]
+                self.data = df_temp # restore
+                self.data["delta_watt_per_kg"] = delta_watt_per_kg / 1 # per kg
+                self.mass = self.mass + 1 # restore
+                
+                # debug
+                print("median delta_watt_per_ms:", self.data["delta_watt_per_ms"].median() * 3.6) # per km/h
+                print("mean delta_watt_per_ms:", self.data["delta_watt_per_ms"].mean() * 3.6) # per km/h
+                print("median delta_watt_per_kg:", self.data["delta_watt_per_kg"].median())
+                print("mean delta_watt_per_kg:", self.data["delta_watt_per_kg"].mean())
+                
+                
+
+    def _process_power(self) -> None:
+        #################
+        ### CONSTANTS ###
+        #################
+        
+        drag_coefficient = self.Cd
+        rho0 = 1.225 # kg/m^3 --> air volumic mass at 0m
+        L = 0.0065 # K/m --> temperature gradient
+        T0 = 288.15 # K --> temperature at 0m
+        R = 287.05 # J/(kg*K) --> gas constant
+        g = 9.807 # m/s^2 --> gravity
 
 
-            #######################
-            ### ABSOLUTE VALUES ###
-            #######################
+        #######################
+        ### ABSOLUTE VALUES ###
+        #######################
+        
+        with Task("Computing drag", new_line=False):
+            projected_frontal_area = 0.0293 * (self.size**0.725) * (self.mass**0.425) + 0.0604
+            self.data['rho'] = rho0 * (1 - L * self.data['altitude'] / T0)**(g / (R * L) - 1)
+            kinetic_pressure = 0.5 * self.data['rho'] * self.data['speed']**2
+            self.data['drag'] = drag_coefficient * projected_frontal_area * kinetic_pressure
+        
+        
+        with Task("Computing kinetic energy", new_line=False):
+            self.data['kinetic_energy'] = 0.5 * (self.mass + self.bike_mass) * self.data['speed']**2
+        with Task("Computing potential energy", new_line=False):
+            self.data['potential_energy'] = (self.mass + self.bike_mass) * 9.81 * self.data['altitude']
+        
+        
+        ####################
+        ### DELTA VALUES ###
+        ####################
+        
+        with Task("Computing delta values", new_line=False):
+            for col in ["time", "distance", "altitude", "speed", "kinetic_energy", "potential_energy"]:
+                self.data[f"delta_{col}"] = self.data[col].diff()
+            self.data = self.data.iloc[1:].copy(deep=True) # first column
             
-            with Task("Computing drag", new_line=False):
-                projected_frontal_area = 0.0293 * (self.size**0.725) * (self.mass**0.425) + 0.0604
-                self.data['rho'] = rho0 * (1 - L * self.data['altitude'] / T0)**(g / (R * L) - 1)
-                kinetic_pressure = 0.5 * self.data['rho'] * self.data['speed']**2
-                self.data['drag'] = drag_coefficient * projected_frontal_area * kinetic_pressure
+            self.data['slope'] = self.data['delta_altitude'] / self.data['delta_distance'] # 100 * slope is slope in % # if you do pause in garmin, distances stop, and if you resume later at different altitude, you get a hudge slope, so we need to be careful with that
+        self.data["delta_time_seconds"] = self.data["delta_time"].dt.total_seconds()
+        
+        with Task("Computing rolling resistance", new_line=False): # needed slope for that
+            Crr = self.Crr 
+            self.data['rolling_resistance'] = Crr * (self.mass + self.bike_mass) * g * np.cos(np.arctan(self.data['slope']))
             
+        
+        ############################
+        ### PAUSE IDENTIFICATION ###
+        ############################
+        
+        with Task("Removing pauses from the ride", new_line=True):
             
-            with Task("Computing kinetic energy", new_line=False):
-                self.data['kinetic_energy'] = 0.5 * (self.mass + self.bike_mass) * self.data['speed']**2
-            with Task("Computing potential energy", new_line=False):
-                self.data['potential_energy'] = (self.mass + self.bike_mass) * 9.81 * self.data['altitude']
+            intitial_length = len(self.data)
+            mask_to_remove = (
+                (self.data['delta_distance'] < 1) & (self.data["delta_time_seconds"] > 10) # no movement (less than 1m) over 10s.
+            ) | (
+                (self.data['delta_distance'] < 1) & (self.data["delta_distance"] < self.data["delta_time_seconds"] * 1) # no movement (less than 10cm) over and average speed of less than 3.6 km/h
+            )
             
+            self.data = self.data[~mask_to_remove].copy(deep=True)
             
-            ####################
-            ### DELTA VALUES ###
-            ####################
+            # remove data where speed, distance delta and time delta don't match
+            mask_to_remove = (
+                (self.data["delta_distance"] - self.data["delta_time_seconds"] * self.data["speed"]).abs() > self.data["delta_distance"] / 2 # tolerate 50% error
+            )
+            self.data = self.data[~mask_to_remove].copy(deep=True)
+        
+        
+            final_length = len(self.data)
+            Message(f"Removed {cstr((intitial_length - final_length)/intitial_length, format_spec='.2%'):y} of the data", "?")
+        self.data["cumulative_time_seconds"] = self.data["delta_time_seconds"].cumsum()
+        
+        with Task("Removing Garmin bugs", new_line=True):
+            mask_to_remove = self.data["delta_time_seconds"] > 5 * self.data["delta_time_seconds"].std() + self.data["delta_time_seconds"].median()
+            mask_to_remove |= self.data["slope"].abs() > 0.4 # 40% slope is very unlikely... this is probably a bug
             
-            with Task("Computing delta values", new_line=False):
-                for col in ["time", "distance", "altitude", "speed", "kinetic_energy", "potential_energy"]:
-                    self.data[f"delta_{col}"] = self.data[col].diff()
-                self.data = self.data.iloc[1:].copy(deep=True) # first column
+            initial_length = len(self.data)
+            self.data = self.data[~mask_to_remove].copy(deep=True)
+            final_length = len(self.data)
+            Message(f"Removed {cstr((initial_length - final_length)/initial_length, format_spec='.2%'):y} of the data", "?")
+            
+        
+        
+        #########################
+        ### POWER COMPUTATION ###
+        #########################
+        
+        with Task("Computing Watts", new_line=False):
+            energy_delta = self.data["delta_kinetic_energy"] + self.data["delta_potential_energy"]
+            drag_power = - self.data["drag"] * self.data["speed"]
+            rolling_resistance_power = - self.data["rolling_resistance"] * self.data["speed"]
+            
+            self.data["watts"] = energy_delta / self.data["delta_time_seconds"] - drag_power - rolling_resistance_power # power(pedalage) + power(drag) = energy / time
+            self.data["watts"] = self.data["watts"].rolling(window=5, min_periods=1, center=True).median() # smooth the power
+            # where watt is nan, set to 0
+            self.data.loc[self.data["watts"].isna(), "watts"] = 0
+            
+            # negative watt means braking!
+            self.data["braking_power"] = self.data["watts"].copy(deep=True)
+            self.data.loc[self.data["watts"] < 0, "watts"] = 0
+            self.data.loc[self.data["braking_power"] > 0, "braking_power"] = 0
+            
+        # finally we do as if the pauses were never there
+        self.data.reset_index(drop=True, inplace=True)
+        
+        
+        ##############################
+        ### SPEED AJUSTED TO SLOPE ###
+        ##############################
+        
+        with Task("Computing speed adjusted to slope", new_line=False):
+            # this is no easy task, we want to solve:
+            # P = [drag/v0^2] * v^3 + [rolling_resistance] * v
+            # we use newton's method to solve this equation
+            
+            def root_deg_3(D, R, P):
+                    roots = np.roots([D, 0, R, -P])
+                    sorted_roots = [r for r in roots if r.real==0 or (r.imag / r.real < 1e-3 and r.real > 0)]
+                    max_real_part = max(sorted_roots, key=lambda r: r.real)
+                    return max_real_part.real
+            
+            self.data['adj_speed'] = .0
+            for i, row in self.data.iterrows():
+                D = 0.5 * row['rho'] * projected_frontal_area * drag_coefficient
+                R = row['rolling_resistance']
+                P = row['watts']
                 
-                self.data['slope'] = self.data['delta_altitude'] / self.data['delta_distance'] # 100 * slope is slope in % # if you do pause in garmin, distances stop, and if you resume later at different altitude, you get a hudge slope, so we need to be careful with that
-            self.data["delta_time_seconds"] = self.data["delta_time"].dt.total_seconds()
-            
-            with Task("Computing rolling resistance", new_line=False): # needed slope for that
-                Crr = self.Crr 
-                self.data['rolling_resistance'] = Crr * (self.mass + self.bike_mass) * g * np.cos(np.arctan(self.data['slope']))
+                self.data.loc[i, 'adj_speed'] = root_deg_3(D, R, P)
                 
+            self.data.loc[
+                self.data['adj_speed'] < self.data['speed'], 'adj_speed'
+            ] = np.nan # remove values in descent where speed is higher than it should be
             
-            ############################
-            ### PAUSE IDENTIFICATION ###
-            ############################
-            
-            with Task("Removing pauses from the ride", new_line=True):
-                
-                intitial_length = len(self.data)
-                mask_to_remove = (
-                    (self.data['delta_distance'] < 1) & (self.data["delta_time_seconds"] > 10) # no movement (less than 1m) over 10s.
-                ) | (
-                    (self.data['delta_distance'] < 1) & (self.data["delta_distance"] < self.data["delta_time_seconds"] * 1) # no movement (less than 10cm) over and average speed of less than 3.6 km/h
-                )
-                
-                self.data = self.data[~mask_to_remove].copy(deep=True)
-                
-                # remove data where speed, distance delta and time delta don't match
-                mask_to_remove = (
-                    (self.data["delta_distance"] - self.data["delta_time_seconds"] * self.data["speed"]).abs() > self.data["delta_distance"] / 2 # tolerate 50% error
-                )
-                self.data = self.data[~mask_to_remove].copy(deep=True)
-            
-            
-                final_length = len(self.data)
-                Message(f"Removed {cstr((intitial_length - final_length)/intitial_length, format_spec='.2%'):y} of the data", "?")
-            self.data["cumulative_time_seconds"] = self.data["delta_time_seconds"].cumsum()
-            
-            with Task("Removing Garmin bugs", new_line=True):
-                mask_to_remove = self.data["delta_time_seconds"] > 5 * self.data["delta_time_seconds"].std() + self.data["delta_time_seconds"].median()
-                mask_to_remove |= self.data["slope"].abs() > 0.4 # 40% slope is very unlikely... this is probably a bug
-                
-                initial_length = len(self.data)
-                self.data = self.data[~mask_to_remove].copy(deep=True)
-                final_length = len(self.data)
-                Message(f"Removed {cstr((initial_length - final_length)/initial_length, format_spec='.2%'):y} of the data", "?")
-                
-            
-            
-            #########################
-            ### POWER COMPUTATION ###
-            #########################
-            
-            with Task("Computing Watts", new_line=False):
-                energy_delta = self.data["delta_kinetic_energy"] + self.data["delta_potential_energy"]
-                drag_power = - self.data["drag"] * self.data["speed"]
-                rolling_resistance_power = - self.data["rolling_resistance"] * self.data["speed"]
-                
-                self.data["watts"] = energy_delta / self.data["delta_time_seconds"] - drag_power - rolling_resistance_power # power(pedalage) + power(drag) = energy / time
-                self.data["watts"] = self.data["watts"].rolling(window=5, min_periods=1, center=True).median() # smooth the power
-                # where watt is nan, set to 0
-                self.data.loc[self.data["watts"].isna(), "watts"] = 0
-                
-                # negative watt means braking!
-                self.data["braking_power"] = self.data["watts"].copy(deep=True)
-                self.data.loc[self.data["watts"] < 0, "watts"] = 0
-                self.data.loc[self.data["braking_power"] > 0, "braking_power"] = 0
-                
-            # finally we do as if the pauses were never there
-            self.data.reset_index(drop=True, inplace=True)
-            
-            
-            ##############################
-            ### SPEED AJUSTED TO SLOPE ###
-            ##############################
-            
-            with Task("Computing speed adjusted to slope", new_line=False):
-                # this is no easy task, we want to solve:
-                # P = [drag/v0^2] * v^3 + [rolling_resistance] * v
-                # we use newton's method to solve this equation
-                
-                def root_deg_3(D, R, P):
-                        roots = np.roots([D, 0, R, -P])
-                        sorted_roots = [r for r in roots if r.real==0 or (r.imag / r.real < 1e-3 and r.real > 0)]
-                        max_real_part = max(sorted_roots, key=lambda r: r.real)
-                        return max_real_part.real
-                
-                self.data['adj_speed'] = .0
-                for i, row in self.data.iterrows():
-                    D = 0.5 * row['rho'] * projected_frontal_area * drag_coefficient
-                    R = row['rolling_resistance']
-                    P = row['watts']
-                    
-                    self.data.loc[i, 'adj_speed'] = root_deg_3(D, R, P)
-                    
-                self.data.loc[
-                    self.data['adj_speed'] < self.data['speed'], 'adj_speed'
-                ] = np.nan # remove values in descent where speed is higher than it should be
-                
-            # let's try to make them equal on flat
-            data_flat = self.data[self.data['slope'].abs() < 0.01]
-            speed_ratio = data_flat['speed'].mean() / data_flat['adj_speed'].mean()
-            Message(f"Adjusted speed anomalous ratio (should be <1, but relatively close to 1): {cstr(speed_ratio, '.2f'):y}", "?")
-            speed_ratio = min(1, speed_ratio)
-            self.data['adj_speed'] = self.data['adj_speed'] * speed_ratio
-            
-            
+        # let's try to make them equal on flat
+        data_flat = self.data[self.data['slope'].abs() < 0.01]
+        speed_ratio = data_flat['speed'].mean() / data_flat['adj_speed'].mean()
+        Message(f"Adjusted speed anomalous ratio (should be <1, but relatively close to 1): {cstr(speed_ratio, '.2f'):y}", "?")
+        speed_ratio = min(1, speed_ratio)
+        self.data['adj_speed'] = self.data['adj_speed'] * speed_ratio
+        
+        
             
             
     def get_data(self, columns:list = None) -> pd.DataFrame:
@@ -429,7 +463,7 @@ class Activity:
         window = int(window_length / dx)
         
         smooth_elevation_gain = np.diff(savgol_filter(activity.data['altitude'], window, 3))
-        df = activity.get_data(columns=['time', 'watts', 'delta_time_seconds', 'cumulative_time_seconds', 'heart_rate'])
+        df = activity.get_data(columns=['time', 'watts', 'delta_time_seconds', 'cumulative_time_seconds', 'heart_rate', 'speed', 'distance', 'delta_distance'])
         return {
             "duration_s": activity.data['cumulative_time_seconds'].iloc[-1],
             "distance_km": activity.data['distance'].iloc[-1] / 1000,
@@ -450,6 +484,65 @@ class Activity:
             "max_heart_rate_bpm": activity.data['heart_rate'].max(),
             "heart_rate_q95_bpm": activity.data['heart_rate'].quantile(0.95),
             "calories_kcal": get_calories(df, activity.mass, activity.age),
-            "efficiency_%": get_efficiency(df, activity.mass, activity.age) * 100
+            "efficiency_%": get_efficiency(df, activity.mass, activity.age) * 100,
+            "equivalent_pasta_grams": get_equivalent_pasta_grams(df, activity.mass, activity.age),
+            "speed_meter_per_second_gain_per_watt": activity.get_speed_gain_per_watt(),
+            "watt_gain_per_kg": activity.get_watt_gain_per_kg(),
+            "time_s_gain_per_watt": activity.get_time_gain_per_watt(),
         }
     
+
+    # ------------------------ #
+    # !-- Advanced Metrics --! #
+    # ------------------------ #
+    
+    def get_speed_gain_per_watt(self) -> float:
+        """
+        Returns
+        -------
+            float: number of m/s gained per additional watt
+        """
+        _df_temp = self.data.copy(deep=True) # we will modify data, but want to restore this one in the end
+        self.data = self.data
+
+        self.data["speed"] = self.data["speed"] +  0.1 # add 0.1 m/s
+        # we also need to update the time delta to match this new speed. time = distance / speed --> dt/dv = -d/v^2 --> time_difference = - delta_d / v^2 * delta_v = - old_delta_time *delta_v/v
+        self.data["delta_time_seconds"] = self.data["delta_time_seconds"] - self.data["delta_time_seconds"] * 0.1 / self.data["speed"]
+        self.data["cumulative_time_seconds"] = self.data["delta_time_seconds"].cumsum()
+        with Message.mute():
+            self._process_power()
+        delta_watt = self.data["watts"].mean() - _df_temp["watts"].mean()
+        self.data = _df_temp # restore
+        
+        return 0.1 / delta_watt
+    
+    def get_watt_gain_per_kg(self) -> float:
+        """
+        Returns
+        -------
+            float: number of W gained per kg lost
+        """
+        _df_temp = self.data.copy(deep=True) # we will modify data, but want to restore this one in the end
+        self.data = self.data
+        self.mass = self.mass - 1 # lose 1kg
+        with Message.mute():
+            self._process_power()
+        delta_watt = _df_temp["watts"].mean() - self.data["watts"].mean()
+        self.data = _df_temp # restore
+        self.mass = self.mass + 1 # restore
+        
+        return delta_watt
+    
+    def get_time_gain_per_watt(self) -> float:
+        """
+        Returns
+        -------
+            float: number of seconds gained (so positive) over the whole activity per additional watt
+        """
+        # let's use the speed gain per watt to compute this
+        speed_gain_per_watt = self.get_speed_gain_per_watt() # m/s per watt
+        total_distance_m = self.data['distance'].iloc[-1]
+        average_speed_m_s = self.data['speed'].median()
+        
+        return total_distance_m / (average_speed_m_s ** 2) * speed_gain_per_watt
+  
