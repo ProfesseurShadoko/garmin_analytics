@@ -129,9 +129,9 @@ class Cstr(str):
         if len(format_spec) == 1:
             for color in colors:
                 if color.startswith(format_spec):
-                    return getattr(self,color)().bold() # arbitrary but useful to fix this choice
+                    return getattr(self,color)()
         
-        return getattr(self,format_spec)().bold()
+        return getattr(self,format_spec)()
 
 
 def cstr(obj:object, format_spec:str='') -> 'Cstr':

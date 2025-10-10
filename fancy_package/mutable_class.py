@@ -1,30 +1,13 @@
 
-
-
 from .fancy_string import cstr
 from .fancy_context_manager import FancyCM
 
 
 
 
-class MutableClass:
+class MutableClass(FancyCM):
     """
-    Implements a class that can be muted, i.e. the method .print of the class can be disabled. 
-    Also implements the possibility of tabing.
-    
-    Properties:
-        - muted: Returns True if the class is muted, False otherwise
-    
-    Methods:
-        - mute: Mutes the class
-        - unmute: Unmutes the class
-        - print: Prints the message if the class is not muted
-    
-    Static Methods:
-        - time: Transforms a number of seconds into a string 'hh:mm:ss'
-        
-    Context Manager:
-        - see silence() method
+    Base class for classes that need to be muted or indented.
     """
     
     mute_count = 0
@@ -32,107 +15,96 @@ class MutableClass:
     indent = 0
     
     
-    ##############
-    ### MUTING ###
-    ##############
+    # -------------- #
+    # !-- Muting --! #
+    # -------------- #
     
-    @classmethod
-    def muted(cls:type) -> bool:
-        """
-        Checks if the class is muted, that is if the mute() function has been called more times than the unmute() function.
-        """
-        return cls.mute_count > 0
-
-    @classmethod
-    def mute(cls:type) -> FancyCM:
-        """
-        Mutes the class. The class will not print any message until the unmute() function is called.
-        Can be used as a context manager. At the exit of the cm, the class will be automatically unmuted.
-        """
-        cls.mute_count += 1
+    @staticmethod
+    def muted() -> bool:
+        return MutableClass.mute_count > 0
+    
+    @staticmethod
+    def mute() -> FancyCM:
+        MutableClass.mute_count += 1
         
         class MuteContext(FancyCM):
             def __exit__(self, *args):
-                cls.unmute()
+                MutableClass.unmute()
                 super().__exit__(*args)
         
         return MuteContext()
-                
-    
-    @classmethod
-    def unmute(cls:type, force:bool = False) -> None:
-        """
-        Decrease the mute count of the class. If force, the mute count is set to 0 directly, unmuting the class, even if 'mute' was called several times before.
-        """
-        if force:
-            cls.mute_count = 0
-            
-        cls.mute_count -= 1
-        cls.mute_count = max(0,cls.mute_count)
-        
-    
-    ############
-    ### TABS ###
-    ############
     
     @staticmethod
-    def tab() -> None:
-        """
-        Increases the indent for every class inheriting from MutableClass. Unlike mute, this is not a classmethod but a static method.
-        Can be used as a context manager. At the exit of the cm, the class will be automatically unmuted.
-        """
+    def unmute() -> None:
+        MutableClass.mute_count -= 1
+        
+    
+    # ------------------- #    
+    # !-- Indentation --! #
+    # ------------------- #
+    
+    @staticmethod
+    def tab() -> FancyCM:
         MutableClass.indent += 1
+        
         class TabContext(FancyCM):
             def __exit__(self, *args):
                 MutableClass.untab()
                 super().__exit__(*args)
         
         return TabContext()
-    
+
     @staticmethod
     def untab() -> None:
-        """
-        Decreases the indent for every class inheriting from MutableClass.
-        """
         MutableClass.indent -= 1
-        MutableClass.indent = max(0,MutableClass.indent)
-        
     
-    #############
-    ### PRINT ###
-    #############
+    def __enter__(self):
+        MutableClass.tab()
+        super().__enter__()
     
-    @classmethod
-    def print(cls:type, *args, **kwargs) -> None:
-        """
-        Same arguments as standard print function. Prints the message if the class is not muted.
-        Added argument: ignore_tabs (bool): if True, the tabs will not be printed.
-        """
-        if cls.muted():
-            return
+    def __exit__(self, *args):
+        MutableClass.untab()
+        super().__exit__(*args)
+    
+    
+    # ------------- #
+    # !-- Print --! #
+    # ------------- #
+    
+    @staticmethod
+    def print(*args, **kwargs) -> None:
         
+        if "ignore_tabs" in kwargs:
+            ignore_tabs = kwargs["ignore_tabs"]
+            del kwargs["ignore_tabs"]
+        else:
+            ignore_tabs = False
+            
+        if "ignore_mute" in kwargs:
+            ignore_mute = kwargs["ignore_mute"]
+            del kwargs["ignore_mute"]
+        else:
+            ignore_mute = False
+            
         if not 'flush' in kwargs:
             kwargs['flush'] = True
-        if MutableClass.indent > 0 and not kwargs.get('ignore_tabs', False):
-            print(" " + ">" * MutableClass.indent, end=" ")
-        if 'ignore_tabs' in kwargs:
-            del kwargs['ignore_tabs']
             
+        if MutableClass.muted() and not ignore_mute:
+            return
+        
+        if MutableClass.indent > 0 and not ignore_tabs:
+            print(" " + ">" * MutableClass.indent, end=" ")
         print(*args, **kwargs)
-    
-    @classmethod
-    def par(cls:type) -> None:
-        """
-        Prints an empty line, if and only if the class is not muted.
-        """
-        cls.print(ignore_tabs=True)
         
     
+    @staticmethod
+    def par() -> None:
+        MutableClass.print()
+        
     
-    ####################
-    ### Time display ###
-    ####################
-    
+    # ------------- #
+    # !-- Utils --! #
+    # ------------- #
     
     @staticmethod
     def time(seconds:float) -> str:
@@ -148,9 +120,41 @@ class MutableClass:
             return f"{hrs:02d}:{mins:02d}:{seconds:02d}"
         else:
             return f"{seconds:.3f}s"
-
+    
+    @staticmethod
+    def date() -> str:
+        """
+        Returns the current date as a string 'YYYY-MM-DD'.
+        """
+        from datetime import datetime
+        now = datetime.now()
+        return now.strftime("%Y-%m-%d")
+    
+    @staticmethod
+    def time_date() -> str:
+        """
+        Returns the current date and time as a string 'YYYY-MM-DD HH:MM:SS'.
+        """
+        from datetime import datetime
+        now = datetime.now()
+        return now.strftime("%Y-%m-%d %H:%M:%S")
+    
+    
+    
+    
+    
+    
+    # --------------- #
+    # !-- Jupyter --! #
+    # --------------- #
+    
+    def __repr__(self) -> str:
+        return "" # avoid displaying in Notebooks, if a message is at the end of the cell
+    
+    
 
 if __name__ == "__main__":
+    # run these tests with python -m fancy_package.mutable_class
     MutableClass.print("This message will be printed.")
     MutableClass.mute()
     MutableClass.print("This message will not be printed.")
@@ -175,7 +179,24 @@ if __name__ == "__main__":
             MutableClass.print("This should be more indented.")
         MutableClass.print("This should be indented.")
     MutableClass.print("This should not be indented.")
+    
+    MutableClass.par()
+    with MutableClass():
+        MutableClass.print("This should be indented.")
+        with MutableClass():
+            MutableClass.print("This should be more indented.")
+        MutableClass.print("This should be indented.")
+        
+    MutableClass.par()
+    MutableClass.print("Testing time and date functions:")
+    with MutableClass():
+        MutableClass.print(f"Current date: {MutableClass.date()}")
+        MutableClass.print(f"Current time and date: {MutableClass.time_date()}")
+        MutableClass.print(f"123.456 seconds is {MutableClass.time(123.456)}")
+    
     MutableClass.print("Done!")
+    
+    
     
         
         

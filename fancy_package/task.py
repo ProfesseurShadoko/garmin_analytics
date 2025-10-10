@@ -6,7 +6,7 @@ from typing import Literal
 import time
 
 
-class Task(MutableClass, FancyCM):
+class Task(MutableClass):
     """
     Inherits from MutableClass and FancyCM. Must be used as a context manager.
     Fancy way of printing a task that is being executed. Displays the time taken to execute the task when it is completed.
@@ -27,7 +27,6 @@ class Task(MutableClass, FancyCM):
         
     def _complete(self) -> None:
         Task.last_task_runtime = time.time() - self.start_time
-        self.untab()
         
         if self._new_line:
             self.print(
@@ -38,9 +37,7 @@ class Task(MutableClass, FancyCM):
                 f" ({cstr(self.time(time.time()-self.start_time)).blue()})", ignore_tabs=True
             )
     
-    def _abort(self) -> None:
-        self.untab()
-        
+    def _abort(self) -> None:        
         if not self._new_line:
             self.print() # we might still be on the line of the first print statement of the Task function, don't stay on the same line
 
@@ -57,20 +54,18 @@ class Task(MutableClass, FancyCM):
     
     def __enter__(self):
         self.__class__.running_tasks.append(self)
-        
         self.print(
             cstr('[~]').blue(), self.msg, end='\n' if self._new_line else ' '
         )
-        
-        MutableClass.tab()
         self.start_time = time.time()
+        super().__enter__() # add to the indentation level
     
     def __exit__(self, exc_type, exc_value, traceback):
         if exc_type is None:
             self._complete()
         else:
             self._abort()
-        super().__exit__(exc_type, exc_value, traceback)
+        super().__exit__(exc_type, exc_value, traceback) # rmeoves the indentation level and handles the exception if any
         
     
     
@@ -79,7 +74,7 @@ class Task(MutableClass, FancyCM):
 
 if __name__ == '__main__':
     
-    from message import Message
+    from .message import Message
     Message("Testing task class.")
     
     with Task("Computing something heavy", new_line=False):
