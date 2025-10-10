@@ -170,8 +170,10 @@ class ActivitySet:
         
         # if no saved values, ask the user
         if email is None or password is None:
-            Message("Please enter your email and password to connect to Garmin API:")
+            Message("Please enter your email and/or password to connect to Garmin API:")
+        if email is None:
             email = getpass.getpass(" > Email: ")
+        if password is None:
             password = getpass.getpass(" > Password: ")
         elif password is None:
             Message("Please enter your password to connect to Garmin API:")
