@@ -10,7 +10,7 @@ import datetime
 
 import requests
 import geopy
-from .fancy_package import Message, cstr
+from oakley import *
 
 class ClimbSet:
     scale = 1000 #m

@@ -1,5 +1,5 @@
 
-from .fancy_package import Task, cstr, Message
+from oakley import *
 from .activity import Activity
 
 import datetime
@@ -142,10 +142,10 @@ class ActivitySet:
         --------
             Raw FitFile object.
         """
-        with Task("Downloading activity", new_line=False):
+        with Task("Downloading activity"):
             data_bytes = garth.download(f"{ActivitySet.download_service}/{activity_id}")
         
-        with Task("Extracting FIT file", new_line=False):
+        with Task("Extracting FIT file"):
             with zipfile.ZipFile(io.BytesIO(data_bytes)) as z:
                 with z.open(f"{activity_id}_ACTIVITY.fit") as f:
                     fit_data = f.read()
@@ -179,12 +179,12 @@ class ActivitySet:
             Message("Please enter your password to connect to Garmin API:")
             password = getpass.getpass(" > Password: ")
         
-        with Task("Connecting to Garmin API", new_line=False):
+        with Task("Connecting to Garmin API"):
             ActivitySet.connect(email, password)
         
-        with Task("Retrieveing activities and user settings:", new_line=True):
+        with Task("Retrieveing activities and user settings:"):
             
-            with Task("Retrieveing mass, height and bike mass", new_line=True):
+            with Task("Retrieveing mass, height and bike mass"):
                 # get the mass
                 try:
                     self.mass = ActivitySet.get_mass()
@@ -235,10 +235,10 @@ class ActivitySet:
                     assert self.gender in ['m','f']
                     
             # get the activities
-            with Task("Retrieving activities", new_line=True):               
+            with Task("Retrieving activities"):               
                 self.activities = ActivitySet.get_activities()
             
-            with Task("Removing activities < 30 minutes", new_line=True):
+            with Task("Removing activities < 30 minutes"):
                 previous_n_activities = len(self.activities)
                 self.activities = self.activities[self.activities["duration"] > datetime.timedelta(minutes=30)].copy(deep=True)
                 Message.print(f"Removed {cstr(previous_n_activities - len(self.activities)):y} activitie(s) out of {previous_n_activities} cycling activities.")
@@ -287,7 +287,7 @@ class ActivitySet:
             Message.print(f"Date: {activity['date']}")
             Message.print(f"ID: {activity['id']}")
         Message.print(ignore_tabs=True)
-        with Task("Loading activity", new_line=True):
+        with Task("Loading activity"):
             fitfile = ActivitySet.download_activity(activity["id"]) # set index starts at one!
         
         Message.print(ignore_tabs=True)

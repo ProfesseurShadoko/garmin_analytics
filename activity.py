@@ -1,5 +1,5 @@
 from fitparse import FitFile
-from .fancy_package import Task, cstr, Message, ProgressBar
+from oakley import *
 from .metrics import *
 
 from typing import Literal
@@ -85,7 +85,7 @@ class Activity:
         ### FITFILE INTO DATAFRAME ###
         ##############################
         
-        with Task("Reformatting FIT file", new_line=True):
+        with Task("Reformatting FIT file"):
             data = []
             for measure in fitfile.get_messages("record"):
                 measure_dict = {}
@@ -137,13 +137,13 @@ class Activity:
         self.data = data
             
         
-        with Task("Processing data", new_line=True):
+        with Task("Processing data"):
             
             ##################
             ### CHECK DATA ###
             ##################
             
-            with Task("Loading data", new_line=False):
+            with Task("Loading data"):
                 required_columns = ["time", "lat", "lon", "distance", "altitude", "heart_rate", "speed"]
                 for col in required_columns:
                     if col not in self.data.columns:
@@ -152,7 +152,7 @@ class Activity:
                     
                 self.data["time"] = pd.to_datetime(self.data["time"])
             
-            with Task("Removing NaN values", new_line=True):
+            with Task("Removing NaN values"):
                 initial = len(self.data)
                 self.data.dropna(inplace=True)
                 final = len(self.data)
@@ -198,11 +198,11 @@ class Activity:
                         return None
                 
                 df = self.data
-                with Task("Correcting altitude with OpenTopoData", new_line=True):
+                with Task("Correcting altitude with OpenTopoData"):
                     new_altitude_data = []
                     N_window = 100 # not allowed to request more than 100 positions at once
                     
-                    for window in ProgressBar([(i*N_window, (i+1)*N_window) for i in range(len(df)//N_window)] + [(len(df)//N_window * N_window, len(df))], new_line=False):
+                    for window in ProgressBar([(i*N_window, (i+1)*N_window) for i in range(len(df)//N_window)] + [(len(df)//N_window * N_window, len(df))]):
                         lats, lons = df["lat"].iloc[window[0]:window[1]], df["lon"].iloc[window[0]:window[1]]
                         if len(lats) == 0:
                             continue
@@ -268,16 +268,16 @@ class Activity:
         ### ABSOLUTE VALUES ###
         #######################
         
-        with Task("Computing drag", new_line=False):
+        with Task("Computing drag"):
             projected_frontal_area = 0.0293 * (self.size**0.725) * (self.mass**0.425) + 0.0604
             self.data['rho'] = rho0 * (1 - L * self.data['altitude'] / T0)**(g / (R * L) - 1)
             kinetic_pressure = 0.5 * self.data['rho'] * self.data['speed']**2
             self.data['drag'] = drag_coefficient * projected_frontal_area * kinetic_pressure
         
         
-        with Task("Computing kinetic energy", new_line=False):
+        with Task("Computing kinetic energy"):
             self.data['kinetic_energy'] = 0.5 * (self.mass + self.bike_mass) * self.data['speed']**2
-        with Task("Computing potential energy", new_line=False):
+        with Task("Computing potential energy"):
             self.data['potential_energy'] = (self.mass + self.bike_mass) * 9.81 * self.data['altitude']
         
         
@@ -285,7 +285,7 @@ class Activity:
         ### DELTA VALUES ###
         ####################
         
-        with Task("Computing delta values", new_line=False):
+        with Task("Computing delta values"):
             for col in ["time", "distance", "altitude", "speed", "kinetic_energy", "potential_energy"]:
                 self.data[f"delta_{col}"] = self.data[col].diff()
             self.data = self.data.iloc[1:].copy(deep=True) # first column
@@ -293,7 +293,7 @@ class Activity:
             self.data['slope'] = self.data['delta_altitude'] / self.data['delta_distance'] # 100 * slope is slope in % # if you do pause in garmin, distances stop, and if you resume later at different altitude, you get a hudge slope, so we need to be careful with that
         self.data["delta_time_seconds"] = self.data["delta_time"].dt.total_seconds()
         
-        with Task("Computing rolling resistance", new_line=False): # needed slope for that
+        with Task("Computing rolling resistance"): # needed slope for that
             Crr = self.Crr 
             self.data['rolling_resistance'] = Crr * (self.mass + self.bike_mass) * g * np.cos(np.arctan(self.data['slope']))
             
@@ -302,7 +302,7 @@ class Activity:
         ### PAUSE IDENTIFICATION ###
         ############################
         
-        with Task("Removing pauses from the ride", new_line=True):
+        with Task("Removing pauses from the ride"):
             
             intitial_length = len(self.data)
             mask_to_remove = (
@@ -324,7 +324,7 @@ class Activity:
             Message(f"Removed {cstr((intitial_length - final_length)/intitial_length, format_spec='.2%'):y} of the data", "?")
         self.data["cumulative_time_seconds"] = self.data["delta_time_seconds"].cumsum()
         
-        with Task("Removing Garmin bugs", new_line=True):
+        with Task("Removing Garmin bugs"):
             mask_to_remove = self.data["delta_time_seconds"] > 5 * self.data["delta_time_seconds"].std() + self.data["delta_time_seconds"].median()
             mask_to_remove |= self.data["slope"].abs() > 0.4 # 40% slope is very unlikely... this is probably a bug
             
@@ -339,7 +339,7 @@ class Activity:
         ### POWER COMPUTATION ###
         #########################
         
-        with Task("Computing Watts", new_line=False):
+        with Task("Computing Watts"):
             energy_delta = self.data["delta_kinetic_energy"] + self.data["delta_potential_energy"]
             drag_power = - self.data["drag"] * self.data["speed"]
             rolling_resistance_power = - self.data["rolling_resistance"] * self.data["speed"]
@@ -362,7 +362,7 @@ class Activity:
         ### SPEED AJUSTED TO SLOPE ###
         ##############################
         
-        with Task("Computing speed adjusted to slope", new_line=False):
+        with Task("Computing speed adjusted to slope"):
             # this is no easy task, we want to solve:
             # P = [drag/v0^2] * v^3 + [rolling_resistance] * v
             # we use newton's method to solve this equation
@@ -486,9 +486,11 @@ class Activity:
             "calories_kcal": get_calories(df, activity.mass, activity.age),
             "efficiency_%": get_efficiency(df, activity.mass, activity.age) * 100,
             "equivalent_pasta_grams": get_equivalent_pasta_grams(df, activity.mass, activity.age),
+            "equivalent_co2_kg": get_equivalent_co2(df),
             "speed_meter_per_second_gain_per_watt": activity.get_speed_gain_per_watt(),
             "watt_gain_per_kg": activity.get_watt_gain_per_kg(),
             "time_s_gain_per_watt": activity.get_time_gain_per_watt(),
+            
         }
     
 

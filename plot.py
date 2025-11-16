@@ -1,7 +1,7 @@
 
 from .activity import Activity
 from .metrics import *
-from .fancy_package import Message, Task, cstr
+from oakley import *
 
 import datetime
 import numpy as np
@@ -67,7 +67,7 @@ def display_activity_stats(activity:Activity):
             ).bold().cyan() + " m"
         )
         
-        Message.print(ignore_tabs=True)
+        Message.par()
         
         # average speed
         Message.print(
@@ -91,7 +91,7 @@ def display_activity_stats(activity:Activity):
         )
 
         
-        Message.print(ignore_tabs=True)
+        Message.par()
         
         # Average power
         Message.print(
@@ -114,7 +114,7 @@ def display_activity_stats(activity:Activity):
             ).bold().cyan() + " W"
         )
         
-        Message.print(ignore_tabs=True)
+        Message.par()
         
         # Average Heart Rate
         Message.print(
@@ -138,7 +138,13 @@ def display_activity_stats(activity:Activity):
         )
         
         # Calories and all
-        Message.print(ignore_tabs=True)
+        Message.par()
+        Message.print(
+            "Efficiency: " + cstr(
+                activity_stats['efficiency_%']/100, format_spec=".0%"
+            ).bold().cyan()
+        )
+        
         Message.print(
             "Calories: " + cstr(
                 round(activity_stats['calories_kcal'])
@@ -152,13 +158,13 @@ def display_activity_stats(activity:Activity):
         )
         
         Message.print(
-            "Efficiency: " + cstr(
-                activity_stats['efficiency_%']/100, format_spec=".0%"
-            ).bold().cyan()
+            "Equivalent CO2 saved: " + cstr(
+                round(activity_stats['equivalent_co2_kg'], 2)
+            ).bold().cyan() + " kg"
         )
         
         # Gains
-        Message.print(ignore_tabs=True)
+        Message.par()
         Message.print(
             "Speed gain per watt: " + cstr(
                 activity_stats['speed_meter_per_second_gain_per_watt'] * 3.6

@@ -189,6 +189,23 @@ def get_equivalent_pasta_grams(df:pd.DataFrame, mass:float, age:int) -> float:
     """
     return get_calories(df, mass, age) / 3.5
 
+def get_equivalent_co2(df:pd.DataFrame) -> float:
+    """
+    Columns
+    -------
+        'distance': float (m)
+    
+    Returns
+    -------
+        float: Equivalent CO2 saved in kg.
+    """
+    d_km = df["distance"].iloc[-1] / 1000
+    # co2_bike = 21e-3 * d_km # 21g of CO2 per km by bike (comes from manufacturing, otherwise negligeable, so let's neglect it)
+    co2_car = 106e-3 * d_km # 106g of CO2 per km by car
+    
+    # FYI: regional plane is aroung 200g CO2 per km, long distance plane around 80g CO2 per km, train around 3g in France, 60g in Europe 
+    # because of electricity mix.
+    return co2_car
 
 def get_efficiency(df:pd.DataFrame, mass:float, age:float) -> float:
     """
