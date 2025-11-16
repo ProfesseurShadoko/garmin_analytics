@@ -309,8 +309,7 @@ class ActivitySet:
         
         try:
             with Message.mute():
-                with Task.mute():
-                    return self.get(self._current_id)
+                return self.get(self._current_id)
         except Exception as e:
             Message.print(ignore_tabs=True)
             Message(f"Could not load activity {self._current_id}. Skipping.", "!")

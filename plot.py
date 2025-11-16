@@ -167,19 +167,19 @@ def display_activity_stats(activity:Activity):
         Message.par()
         Message.print(
             "Speed gain per watt: " + cstr(
-                activity_stats['speed_meter_per_second_gain_per_watt'] * 3.6
+                round(activity_stats['speed_meter_per_second_gain_per_watt'] * 3.6, 1)
             ).bold().cyan() + " km/h/W"
         )
         
         Message.print(
             "Time gain per watt: " + cstr(
-                activity_stats['time_s_gain_per_watt']
+                round(activity_stats['time_s_gain_per_watt'], 0)
             ).bold().cyan() + " s/W"
         )
         
         Message.print(
             "Watt gain per kg: " + cstr(
-                activity_stats['watt_gain_per_kg']
+                round(activity_stats['watt_gain_per_kg'], 0)
             ).bold().cyan() + " W/kg"
         )
         
