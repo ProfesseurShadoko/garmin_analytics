@@ -67,7 +67,7 @@ def display_activity_stats(activity:Activity):
             ).bold().cyan() + " m"
         )
         
-        Message.par()
+        Message.print()
         
         # average speed
         Message.print(
@@ -91,7 +91,7 @@ def display_activity_stats(activity:Activity):
         )
 
         
-        Message.par()
+        Message.print()
         
         # Average power
         Message.print(
@@ -114,7 +114,7 @@ def display_activity_stats(activity:Activity):
             ).bold().cyan() + " W"
         )
         
-        Message.par()
+        Message.print()
         
         # Average Heart Rate
         Message.print(
@@ -138,7 +138,7 @@ def display_activity_stats(activity:Activity):
         )
         
         # Calories and all
-        Message.par()
+        Message.print()
         Message.print(
             "Efficiency: " + cstr(
                 activity_stats['efficiency_%']/100, format_spec=".0%"
@@ -164,7 +164,7 @@ def display_activity_stats(activity:Activity):
         )
         
         # Gains
-        Message.par()
+        Message.print()
         Message.print(
             "Speed gain per watt: " + cstr(
                 round(activity_stats['speed_meter_per_second_gain_per_watt'] * 3.6, 1)

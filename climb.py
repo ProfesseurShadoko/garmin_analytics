@@ -243,7 +243,7 @@ class ClimbSet:
                 climb_time = climb["delta_time_seconds"].sum()
                 avg_speed_kmh = climb_distance / climb_time * 3.6
                 
-                Message.par()
+                Message.print()
                 with Message(f"Climb n°{i} (category {self.climb_category(climb)})").tab():
                     Message.print(f"Distance: {climb_distance/1000:.1f} km")
                     Message.print(f"Elevation gain: {climb_height:.0f} m ({cstr(climb_height/climb_distance, format_spec='.1%').red().bold()} slope)")
