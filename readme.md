@@ -17,11 +17,18 @@ The goal of this project is to:
 
 ## How to Use
 
+You might want to use a new environment, for instance with:
+```bash
+conda create --name garmin python=3.13
+conda activate garmin
+```
+
 Clone the repository and install the dependencies:
 
 ```bash
 git clone https://github.com/ProfesseurShadoko/garmin_analytics.git
-pip install -r garmin_analytics/requirements.txt
+cd garmin_analytics
+pip install -r requirements.txt
 ```
 
 Then, you wil need to download the data of your ride(s) (from Strava, Garmin Connect, etc.). The expected filetype is `.fit`, which is the default pretty much everywhere. Put all the files insied any directory. You must however add the path to this directory to your environment variables, as it will be loaded in python through `os.environ["GARMIN"]` (even if your device isn't a Garmin device). Alternatively, you can set `os.environ["GARMIN"] = "path/to/the/folder"` prior to running your code (see the notebook [garmin_analytics.ipynb](garmin_analytics.ipynb)).

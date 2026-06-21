@@ -20,7 +20,7 @@ class ClimbSet:
     required_columns = ["distance", "altitude", "slope", "lon", "lat", "delta_time_seconds", "watts", "heart_rate"]
     
     def __init__(self, data:pd.DataFrame, minimal_difficulty_score:float=30):
-        self.minimal_difficulty_score = minimal_difficulty_score
+        ClimbSet.minimal_difficulty_score = minimal_difficulty_score
     
         assert all([col in data.columns for col in self.required_columns]), f"Missing required columns. Are required: {self.required_columns}"
         data = data[self.required_columns]
