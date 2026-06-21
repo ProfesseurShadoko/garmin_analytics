@@ -2,11 +2,12 @@
 
 **Garmin Analytics** is a project born from a love of cycling and curiosity about the science behind performance metrics. Designed for amateur cyclists, this project explores the physics of cycling and provides an accessible way to analyze and visualize your rides without needing a power meter.
 
-The core of this project is the **`garmin_analytics.ipynb`** notebook, which automates:
+The core of this project is the [garmin_analytics.ipynb](garmin_analytics.ipynb) notebook, which automates:
 
-- Connecting to Garmin Connect to retrieve your profile and activity data.
+- ~~ Connecting to Garmin Connect to retrieve your profile and activity data. ~~
 - Computing estimated power output using drag estimation, elevation changes, and speed variations.
 - Visualizing various metrics like slope-corrected speed, peak power output (PPO), functional threshold power (FTP), VO₂ max, calorie consumption, power efficiency, and more.
+- Vizualization of performance during automatically identified climbs
 
 The goal of this project is to:
 
@@ -14,34 +15,21 @@ The goal of this project is to:
 - **Share insights** into how platforms like Garmin compute their metrics.
 - **Track progression** over time to gain a deeper understanding of training.
 
-## Features
-
-- Automatically fetches Garmin data, including personal metrics and activity history.
-- Computes missing power data using physical principles.
-- Creates visually rich plots to analyze individual rides and training progression.
-- Fully runnable on **Google Colab** for ease of use—no setup required!
-
 ## How to Use
 
 Clone the repository and install the dependencies:
 
 ```bash
-!git clone https://github.com/ProfesseurShadoko/garmin_analytics.git
-!pip install -r garmin_analytics/requirements.txt
+git clone https://github.com/ProfesseurShadoko/garmin_analytics.git
+pip install -r garmin_analytics/requirements.txt
 ```
 
-Alternatively, you can explore and run the notebook directly on [Google Colab](https://colab.research.google.com/drive/1HUpoJkPbcm-DYhw0lHtFHNQtCdfP05UL "Open Colab"). This option simplifies the installation process, especially for those unfamiliar with Python, although it may run slightly slower.
+Then, you wil need to download the data of your ride(s) (from Strava, Garmin Connect, etc.). The expected filetype is `.fit`, which is the default pretty much everywhere. Put all the files insied any directory. You must however add the path to this directory to your environment variables, as it will be loaded in python through `os.environ["GARMIN"]` (even if your device isn't a Garmin device). Alternatively, you can set `os.environ["GARMIN"] = "path/to/the/folder"` prior to running your code (see the notebook [garmin_analytics.ipynb](garmin_analytics.ipynb)).
 
 ## Get Started
 
-Open the **`garmin_analytics.ipynb`** file to dive into the analysis. The notebook contains detailed explanations of the computations, equations, and visualizations, making it easy to follow along and adapt the analysis to your needs.
+Open the [garmin_analytics.ipynb](garmin_analytics.ipynb) file to dive into the analysis. The notebook contains detailed explanations of the computations, equations, and visualizations, making it easy to follow along and adapt the analysis to your needs.
 
-Whether you're here to have fun with physics, track your performance, or learn how platforms like Garmin and Strava process cycling data, **Garmin Analytics** is your gateway to uncovering the science behind the ride.
+## If you do not use Garmin
 
-## If you don't use Garmin
-
-Alternatively, you can direclty import a *.fit* file and give it to the algorithm. The Notebook `fit_upload_analytics.ipynb` explains how to do it, either on your computer or on [Google Colab](https://colab.research.google.com/drive/1jmD4NH9Tys4aRpTD7EvTdGG3M0xx1xcG?usp=sharing "Open Upload Notebook").
-
-## Note from the author
-
-This is my first project aimed at being shared with other people, so I am not yet familiar with how GitHub works or the best practices for organizing and presenting such projects. If you encounter any issues or have suggestions for improvement, please feel free to reach out or open an issue. I’m eager to learn and make this project as accessible and helpful as possible. Thank you for checking it out! 😃
+Don't worry, everything should work just the same! Just download the `.fit` files from Strava or anywhere.

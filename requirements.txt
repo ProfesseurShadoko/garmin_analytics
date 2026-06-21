@@ -7,3 +7,4 @@ fitparse
 folium
 geopy
 oakley
+jupyter
