@@ -3,7 +3,7 @@ numpy
 pandas
 scipy
 fitparse
-garth
+#garth
 folium
 geopy
 oakley
