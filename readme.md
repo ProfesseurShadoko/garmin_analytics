@@ -17,7 +17,9 @@ The goal of this project is to:
 
 ## How to Use
 
-You might want to use a new environment, for instance with:
+The easiest way to use the software is through [this Google Colab Notebook](https://colab.research.google.com/drive/1DMXQnHCKSNpVVjasocC4wAE6A3z9Jt3P#scrollTo=2dAbeuynJ3n5). 
+
+If you want to install it locally, you might want to use a new environment, for instance with:
 ```bash
 conda create --name garmin python=3.13
 conda activate garmin
