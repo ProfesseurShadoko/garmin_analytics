@@ -320,7 +320,8 @@ class Activity:
         with Message("Removing Garmin bugs"):
             mask_to_remove = self.data["delta_time_seconds"] > 5 * self.data["delta_time_seconds"].std() + self.data["delta_time_seconds"].median()
             mask_to_remove |= self.data["slope"].abs() > 0.4 # 40% slope is very unlikely... this is probably a bug
-            
+            mask_to_remove |= self.data["slope"].isna()
+
             initial_length = len(self.data)
             self.data = self.data[~mask_to_remove].copy(deep=True)
             final_length = len(self.data)
@@ -372,8 +373,11 @@ class Activity:
                 R = row['rolling_resistance']
                 P = row['watts']
                 
-                self.data.loc[i, 'adj_speed'] = root_deg_3(D, R, P)
-                
+                try:
+                    self.data.loc[i, 'adj_speed'] = root_deg_3(D, R, P)
+                except:
+                    self.data.loc[i, 'adj_speed'] = np.nan
+
             self.data.loc[
                 self.data['adj_speed'] < self.data['speed'], 'adj_speed'
             ] = np.nan # remove values in descent where speed is higher than it should be
