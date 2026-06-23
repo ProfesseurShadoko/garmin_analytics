@@ -30,7 +30,6 @@ cache_filepath = os.path.join(os.path.dirname(__file__), "city_cache.json")
 city_cache = XConfig(cache_filepath)
 
 
-
 class ActivitySet:
 
     city_cache = city_cache
@@ -147,13 +146,20 @@ class ActivitySet:
         session_message = next(fit_file.get_messages("session"))
 
         # 3. Extract relevant metadata
+        def get_value(message, field_name, default=None):
+            field = message.get(field_name)
+            if field is not None:
+                return field.value
+            else:
+                return default
+
         metadata = {
-            "start_time": session_message.get("start_time").value,
-            "total_distance": session_message.get("total_distance").value,
-            "total_ascent": session_message.get("total_ascent").value,
-            "sport": session_message.get("sport").value,
-            "start_position_lat": session_message.get("start_position_lat").value / 11930465,
-            "start_position_long": session_message.get("start_position_long").value / 11930465, # in degrees
+            "start_time": get_value(session_message, "start_time", default=datetime.datetime(1970, 1, 1)),
+            "total_distance": get_value(session_message, "total_distance", default=0),
+            "total_ascent": get_value(session_message, "total_ascent", default=0),
+            "sport": get_value(session_message, "sport", default="unknown"),
+            "start_position_lat": get_value(session_message, "start_position_lat", default=50.6927 * 11930465) / 11930465,
+            "start_position_long": get_value(session_message, "start_position_long", default=3.1746 * 11930465) / 11930465, # in degrees
         }
 
         # 4. Extract enhanced_avg_speed if available, else extract avg_speed
@@ -161,7 +167,7 @@ class ActivitySet:
         if enhanced_avg_speed is not None:
             metadata["avg_speed"] = enhanced_avg_speed.value * 3.6
         else:
-            metadata["avg_speed"] = session_message.get("avg_speed").value * 3.6
+            metadata["avg_speed"] = get_value(session_message, "avg_speed", default=0) * 3.6
 
         lon, lat = metadata["start_position_long"], metadata["start_position_lat"]
         if str((np.round(lon, 3), np.round(lat, 3))) in ActivitySet.city_cache:
