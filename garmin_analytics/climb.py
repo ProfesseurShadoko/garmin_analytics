@@ -30,35 +30,16 @@ class ClimbSet:
         self.climb_start_candidates = []
         self.climbs = []
 
-        #print("Data smooth")
         self.smooth_data() # remove high frequency features, noise
-        #self.show()
-        
-        #print("Find maxima and minima")
         self.find_maxima_minima() 
-        #self.show()
-        
-        #print("Find climb candidates, high enough maxima")
         self.find_climb_candidates() # find local maxima that are significantly above neighbouring points
-        #self.show()
-        
-        #print("Merge climb candidates, no local minima inbetween")
         self.merge_candidates() # if two condidates are very close, it can happen that there is no local minima inbetween. this means that both candidates are probably part of the same climb
-        #self.show()
-        
-        #print("Find start of climbs, no double local minimas")
         self.merge_start_candidates() # for each candidate (local maximum), we want to find the start of the climb. candidates are, for now, one of the previous local minima
-        #self.show()
-        
-        #print("Extract climbs")
         self.extract_climbs() # for each climb, we extract the corresponding dataset
-        #self.show()
-        
         self.cut_climbs() # for each climb, we find the exact start by looking at the slope
-        #self.show()
-        
         self.clean_climbs() # remove climbs that are too flat, too short
-        #self.show()
+        self.label_climbs() # for each climb, give a number
+        self.combine_climbs() # for each consecutive pair of climbs, combine them, and see wether they are in a category. if so, combine.
     
     
     def smooth_data(self):
@@ -194,6 +175,39 @@ class ClimbSet:
             climbs.append(climb)
         
         self.climbs = climbs
+
+    def label_climbs(self):
+        for i, climb in enumerate(self.climbs, start=1):
+            climb:pd.DataFrame
+            climb["climb_label"] = str(i)
+
+    def combine_climbs(self):
+        # 1. Start by looking at the last climb
+        i = len(self.climbs) - 1
+
+        # 2. For each climb, look at the previous climbs and see if they can be combined
+        while i > 0:
+            climb = self.climbs[i]
+            climb_end_distance = climb["distance"].iloc[-1]
+            final_merged_climb = None
+            # 3. test all previous climbs, and combine
+            for j in range(i-1, -1, -1): # all the way to zero
+                previous_climb = self.climbs[j]
+                climb_start_distance = previous_climb["distance"].iloc[0]
+                merged_climb = self.data[self.data["distance"].between(climb_start_distance, climb_end_distance, inclusive="both")].copy(deep=True)
+                # 4. If the climb becomes too bad, stop merging
+                if ClimbSet._difficulty_score(merged_climb) > ClimbSet._difficulty_score(climb) and ClimbSet._difficulty_score(merged_climb) > ClimbSet._difficulty_score(previous_climb):
+                    # the combined version is more itneresting than both of them, we can keep it
+                    final_merged_climb = merged_climb
+                    final_merged_climb["climb_label"] = "+".join([str(k+1) for k in range(j, i+1)])
+            if final_merged_climb is not None:
+                # we found a merged climb, we need to replace the previous climbs with the merged one
+                self.climbs = self.climbs[:i+1] + [final_merged_climb] + self.climbs[i+1:]
+            # 5. Move to the previous climb
+            i -= 1
+        
+                
+
         
             
     
@@ -244,8 +258,10 @@ class ClimbSet:
                 avg_speed_kmh = climb_distance / climb_time * 3.6
                 
                 Message.print()
-                with Message(f"Climb n°{i} (category {self.climb_category(climb)})").tab():
-                    Message.print(f"Distance: {climb_distance/1000:.1f} km")
+                climb_category = ClimbSet.climb_category(climb)
+                cimb_category_str = f"Category {climb_category}" if climb_category != 0 else "HC"
+                with Message(f"Climb n°{climb['climb_label'].iloc[-1]} ({cimb_category_str})").tab():
+                    Message.print(f"Distance: {climb_distance/1000:.1f} km ({cstr(Message.time(climb_time)).green().bold()})")
                     Message.print(f"Elevation gain: {climb_height:.0f} m ({cstr(climb_height/climb_distance, format_spec='.1%').red().bold()} slope)")
                     Message.print(f"Average speed: {avg_speed_kmh:.1f} km/h ({cstr(climb['watts'].mean(), format_spec='.0f').yellow().bold()} W)")
                     Message.print(f"Average heart rate: {climb['heart_rate'].mean():.0f} bpm")
@@ -311,7 +327,7 @@ class ClimbSet:
 
         assert all([col in climb.columns for col in  ClimbSet.required_columns]), "Missing required columns. Are required: distance, altitude, slope, lon, lat"
         
-        climb = climb[ClimbSet.required_columns].copy(deep=True)
+        climb = climb.copy(deep=True)
         climb["distance"] -= climb["distance"].iloc[0]
         
         climb_distance = climb["distance"].iloc[-1]
@@ -355,8 +371,8 @@ class ClimbSet:
         plt.figure(figsize=(15, 8))
         plt.title(
             f"{ClimbSet.find_climb_location(climb)}\n" +\
-                f"{category} ({score})\n" +\
-                    f"{climb_height:.0f}m - {climb_distance/1000:.1f}km\n" +\
+                f"Climb n°{climb['climb_label'].iloc[-1]}: {category} ({score})\n" +\
+                    f"{climb_height:.0f}m - {climb_distance/1000:.1f}km - " +\
                         f"{datetime.timedelta(seconds=climb_time)} - {avg_speed_kmh:.1f}km/h"
         )
         
