@@ -256,6 +256,9 @@ class Activity:
         R = 287.05 # J/(kg*K) --> gas constant
         g = 9.807 # m/s^2 --> gravity
 
+        # compute smooth speed for drag estimation
+        self.data["smooth_speed"] = savgol_filter(self.data["speed"], 5, 3)
+
 
         #######################
         ### ABSOLUTE VALUES ###
@@ -264,12 +267,12 @@ class Activity:
         with Message("Computing drag"):
             projected_frontal_area = 0.0293 * (self.size**0.725) * (self.mass**0.425) + 0.0604
             self.data['rho'] = rho0 * (1 - L * self.data['altitude'] / T0)**(g / (R * L) - 1)
-            kinetic_pressure = 0.5 * self.data['rho'] * self.data['speed']**2
+            kinetic_pressure = 0.5 * self.data['rho'] * self.data['smooth_speed']**2
             self.data['drag'] = drag_coefficient * projected_frontal_area * kinetic_pressure
         
         
         with Message("Computing kinetic energy"):
-            self.data['kinetic_energy'] = 0.5 * (self.mass + self.bike_mass) * self.data['speed']**2
+            self.data['kinetic_energy'] = 0.5 * (self.mass + self.bike_mass) * self.data['smooth_speed']**2
         with Message("Computing potential energy"):
             self.data['potential_energy'] = (self.mass + self.bike_mass) * 9.81 * self.data['altitude']
         
